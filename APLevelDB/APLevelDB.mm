@@ -212,6 +212,32 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 }
 
 
+#pragma mark - Subscripting Support
+
+- (id)objectForKeyedSubscript:(id)key
+{
+    if (![key respondsToSelector: @selector(componentsSeparatedByString:)])
+	{
+		[NSException raise:NSInvalidArgumentException format:@"key must be an NSString"];
+    }
+	return [self stringForKey:key];
+}
+- (void)setObject:(id)thing forKeyedSubscript:(id<NSCopying>)key
+{
+    id idKey = (id) key;
+    if (![idKey respondsToSelector: @selector(componentsSeparatedByString:)])
+	{
+		[NSException raise:NSInvalidArgumentException format:@"key must be NSString or NSData"];
+    }
+	
+	if ([thing respondsToSelector:@selector(componentsSeparatedByString:)])
+		[self setString:thing forKey:(NSString *)key];
+	else if ([thing respondsToSelector:@selector(subdataWithRange:)])
+		[self setData:thing forKey:(NSString *)key];
+	else
+		[NSException raise:NSInvalidArgumentException format:@"object must be NSString or NSData"];
+}
+
 @end
 
 
@@ -238,6 +264,8 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 	{
 		mIter = db.db->NewIterator(leveldb::ReadOptions());
 		mIter->SeekToFirst();
+		if (!mIter->Valid())
+			return nil;
 	}
 	return self;
 }

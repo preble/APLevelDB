@@ -6,8 +6,24 @@ APLevelDB is comprised of two classes, `APLevelDB` and `APLevelDBIterator`.  It 
 
 ## Usage
 
-1. Download [LevelDB][] and compile it to a library, libleveldb.a (`make` or `make PLATFORM=IOS`).  Add the library and all of the LevelDB header files to your Xcode project.
-2. Add `APLevelDB.h` and `APLevelDB.mm` to your project.
+Fetch the LevelDB submodule:
+
+	git submodule init
+	git submodule update
+
+Compile LevelDB for Mac:
+
+	cd leveldb
+	CXXFLAGS=-stdlib=libc++ make
+
+Or for iOS:
+
+	cd leveldb
+	CXXFLAGS=-stdlib=libc++ make PLATFORM=IOS
+
+Open `APLevelDB.xcodeproj` and run the unit tests (Product, Test) or compile the APLevelDB framework and add it to your project.
+
+Note about the `CXXFLAGS` variable: By default leveldb appears to build with libstdc++, where Xcode projects build with libc++. In order to avoid setting the C++ Standard Library build setting, I build leveldb this way.
 
 ### Creating An Instance
 

@@ -48,6 +48,17 @@ extern NSString * const APLevelDBErrorDomain;
 - (void)enumerateKeys:(void (^)(NSString *key, BOOL *stop))block;
 - (void)enumerateKeysAndValuesAsStrings:(void (^)(NSString *key, NSString *value, BOOL *stop))block;
 
+// Objective-C Subscripting Support:
+//   The database object supports subscripting for string-string and string-data key-value access and assignment.
+//   Examples:
+//     db[@"key"] = @"value";
+//     db[@"key"] = [NSData data];
+//     NSString *s = db[@"key"];
+//   An NSInvalidArgumentException is raised if the key is not an NSString, or if the assigned object is not an
+//   instance of NSString or NSData.
+- (id)objectForKeyedSubscript:(id)key;
+- (void)setObject:(id)object forKeyedSubscript:(id<NSCopying>)key;
+
 @end
 
 
