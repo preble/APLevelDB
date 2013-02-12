@@ -249,13 +249,22 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 
 #pragma mark - Atomic Updates
 
-- (void)updateAtomicallyUsingBlock:(void (^)(id<APLevelDBWriteBatch>, void(^)()))block
+- (id<APLevelDBWriteBatch>)beginWriteBatch
 {
 	APLevelDBWriteBatch *batch = [[APLevelDBWriteBatch alloc] init];
-	void (^performBlock)() = ^{
-		_db->Write(_writeOptions, &batch->_batch);
-	};
-	block(batch, [performBlock copy]);
+	return batch;
+}
+
+- (BOOL)commitWriteBatch:(id<APLevelDBWriteBatch>)theBatch
+{
+	if (!theBatch)
+		return NO;
+	
+	APLevelDBWriteBatch *batch = theBatch;
+	
+	leveldb::Status status;
+	status = _db->Write(_writeOptions, &batch->_batch);
+	return (status.ok() == true);
 }
 
 @end
@@ -353,7 +362,7 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 
 
 
-#pragma mark - WriteBatch
+#pragma mark - APLevelDBWriteBatch
 
 @implementation APLevelDBWriteBatch
 

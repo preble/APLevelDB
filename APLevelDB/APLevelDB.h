@@ -59,10 +59,9 @@ extern NSString * const APLevelDBErrorDomain;
 - (id)objectForKeyedSubscript:(id)key;
 - (void)setObject:(id)object forKeyedSubscript:(id<NSCopying>)key;
 
-// Batch update support:
-// Caller should invoke the writeBlock() parameter to its own block in order to finally apply the update.
-// writeBlock does not need to be invoked before returning from the caller's block.
-- (void)updateAtomicallyUsingBlock:(void (^)(id<APLevelDBWriteBatch> batch, void (^writeBlock)()))block;
+// Batch write/atomic update support:
+- (id<APLevelDBWriteBatch>)beginWriteBatch;
+- (BOOL)commitWriteBatch:(id<APLevelDBWriteBatch>)batch;
 
 @end
 
