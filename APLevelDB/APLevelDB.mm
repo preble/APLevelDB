@@ -62,9 +62,9 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 #pragma mark - APLevelDB
 
 @interface APLevelDB () {
-	leveldb::DB *mDB;
-	leveldb::ReadOptions mReadOptions;
-	leveldb::WriteOptions mWriteOptions;
+	leveldb::DB *_db;
+	leveldb::ReadOptions _readOptions;
+	leveldb::WriteOptions _writeOptions;
 }
 - (id)initWithPath:(NSString *)path error:(NSError **)errorOut;
 + (leveldb::Options)defaultCreateOptions;
@@ -74,8 +74,8 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 
 @implementation APLevelDB
 
-@synthesize path = mPath;
-@synthesize db=mDB;
+@synthesize path = _path;
+@synthesize db = _db;
 
 + (APLevelDB *)levelDBWithPath:(NSString *)path error:(NSError **)errorOut
 {
@@ -86,11 +86,11 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 {
 	if ((self = [super init]))
 	{
-		mPath = path;
+		_path = path;
 		
 		leveldb::Options options = [[self class] defaultCreateOptions];
 		
-		leveldb::Status status = leveldb::DB::Open(options, [mPath UTF8String], &mDB);
+		leveldb::Status status = leveldb::DB::Open(options, [_path UTF8String], &_db);
 
 		if (!status.ok())
 		{
@@ -104,15 +104,15 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 			return nil;
 		}
 		
-		mWriteOptions.sync = false;
+		_writeOptions.sync = false;
 	}
 	return self;
 }
 
 - (void)dealloc
 {
-	delete mDB;
-	mDB = NULL;
+	delete _db;
+	_db = NULL;
 }
 
 + (leveldb::Options)defaultCreateOptions
@@ -126,7 +126,7 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 {
 	leveldb::Slice keySlice = SliceFromString(key);
 	leveldb::Slice valueSlice = leveldb::Slice((const char *)[data bytes], (size_t)[data length]);
-	leveldb::Status status = mDB->Put(mWriteOptions, keySlice, valueSlice);
+	leveldb::Status status = _db->Put(_writeOptions, keySlice, valueSlice);
 	return (status.ok() == true);
 }
 
@@ -135,7 +135,7 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 	// This could have been based on 
 	leveldb::Slice keySlice = SliceFromString(key);
 	leveldb::Slice valueSlice = SliceFromString(str);
-	leveldb::Status status = mDB->Put(mWriteOptions, keySlice, valueSlice);
+	leveldb::Status status = _db->Put(_writeOptions, keySlice, valueSlice);
 	return (status.ok() == true);
 }
 
@@ -143,7 +143,7 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 {
 	leveldb::Slice keySlice = SliceFromString(key);
 	std::string valueCPPString;
-	leveldb::Status status = mDB->Get(mReadOptions, keySlice, &valueCPPString);
+	leveldb::Status status = _db->Get(_readOptions, keySlice, &valueCPPString);
 
 	if (!status.ok())
 		return nil;
@@ -155,7 +155,7 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 {
 	leveldb::Slice keySlice = SliceFromString(key);
 	std::string valueCPPString;
-	leveldb::Status status = mDB->Get(mReadOptions, keySlice, &valueCPPString);
+	leveldb::Status status = _db->Get(_readOptions, keySlice, &valueCPPString);
 	
 	// We assume (dangerously?) UTF-8 string encoding:
 	if (!status.ok())
@@ -167,7 +167,7 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 - (BOOL)removeKey:(NSString *)key
 {
 	leveldb::Slice keySlice = SliceFromString(key);
-	leveldb::Status status = mDB->Delete(mWriteOptions, keySlice);
+	leveldb::Status status = _db->Delete(_writeOptions, keySlice);
 	return (status.ok() == true);
 }
 
@@ -183,7 +183,7 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 - (void)enumerateKeysAndValuesAsStrings:(void (^)(NSString *key, NSString *value, BOOL *stop))block
 {
 	BOOL stop = NO;
-	leveldb::Iterator* iter = mDB->NewIterator(leveldb::ReadOptions());
+	leveldb::Iterator* iter = _db->NewIterator(leveldb::ReadOptions());
 	for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
 		leveldb::Slice key = iter->key(), value = iter->value();
 		NSString *k = StringFromSlice(key);
@@ -199,7 +199,7 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 - (void)enumerateKeys:(void (^)(NSString *key, BOOL *stop))block
 {
 	BOOL stop = NO;
-	leveldb::Iterator* iter = mDB->NewIterator(leveldb::ReadOptions());
+	leveldb::Iterator* iter = _db->NewIterator(leveldb::ReadOptions());
 	for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
 		leveldb::Slice key = iter->key();
 		NSString *k = StringFromSlice(key);
@@ -244,7 +244,7 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 #pragma mark - APLevelDBIterator
 
 @interface APLevelDBIterator () {
-	leveldb::Iterator *mIter;
+	leveldb::Iterator *_iter;
 }
 @end
 
@@ -262,9 +262,9 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 {
 	if ((self = [super init]))
 	{
-		mIter = db.db->NewIterator(leveldb::ReadOptions());
-		mIter->SeekToFirst();
-		if (!mIter->Valid())
+		_iter = db.db->NewIterator(leveldb::ReadOptions());
+		_iter->SeekToFirst();
+		if (!_iter->Valid())
 			return nil;
 	}
 	return self;
@@ -278,54 +278,54 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 
 - (void)dealloc
 {
-	delete mIter;
-	mIter = NULL;
+	delete _iter;
+	_iter = NULL;
 }
 
 - (BOOL)seekToKey:(NSString *)key
 {
 	leveldb::Slice target = SliceFromString(key);
-	mIter->Seek(target);
-	return mIter->Valid() == true;
+	_iter->Seek(target);
+	return _iter->Valid() == true;
 }
 
 - (void)seekToFirst
 {
-	mIter->SeekToFirst();
+	_iter->SeekToFirst();
 }
 
 - (void)seekToLast
 {
-	mIter->SeekToLast();
+	_iter->SeekToLast();
 }
 
 - (NSString *)nextKey
 {
-	mIter->Next();
+	_iter->Next();
 	return [self key];
 }
 
 - (NSString *)key
 {
-	if (mIter->Valid() == false)
+	if (_iter->Valid() == false)
 		return nil;
-	leveldb::Slice value = mIter->key();
+	leveldb::Slice value = _iter->key();
 	return StringFromSlice(value);
 }
 
 - (NSString *)valueAsString
 {
-	if (mIter->Valid() == false)
+	if (_iter->Valid() == false)
 		return nil;
-	leveldb::Slice value = mIter->value();
+	leveldb::Slice value = _iter->value();
 	return StringFromSlice(value);
 }
 
 - (NSData *)valueAsData
 {
-	if (mIter->Valid() == false)
+	if (_iter->Valid() == false)
 		return nil;
-	leveldb::Slice value = mIter->value();
+	leveldb::Slice value = _iter->value();
 	return [NSData dataWithBytes:value.data() length:value.size()];
 }
 
