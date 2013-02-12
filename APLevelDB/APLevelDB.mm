@@ -53,11 +53,20 @@
 
 #import <leveldb/db.h>
 #import <leveldb/options.h>
+#import <leveldb/write_batch.h>
 
 NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 
 #define SliceFromString(_string_) (leveldb::Slice((char *)[_string_ UTF8String], [_string_ lengthOfBytesUsingEncoding:NSUTF8StringEncoding]))
 #define StringFromSlice(_slice_) ([[NSString alloc] initWithBytes:_slice_.data() length:_slice_.size() encoding:NSUTF8StringEncoding])
+
+
+@interface APLevelDBWriteBatch : NSObject <APLevelDBWriteBatch> {
+@package
+	leveldb::WriteBatch _batch;
+}
+@end
+
 
 #pragma mark - APLevelDB
 
@@ -238,6 +247,17 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 		[NSException raise:NSInvalidArgumentException format:@"object must be NSString or NSData"];
 }
 
+#pragma mark - Atomic Updates
+
+- (void)updateAtomicallyUsingBlock:(void (^)(id<APLevelDBWriteBatch>, void(^)()))block
+{
+	APLevelDBWriteBatch *batch = [[APLevelDBWriteBatch alloc] init];
+	void (^performBlock)() = ^{
+		_db->Write(_writeOptions, &batch->_batch);
+	};
+	block(batch, [performBlock copy]);
+}
+
 @end
 
 
@@ -330,3 +350,36 @@ NSString * const APLevelDBErrorDomain = @"APLevelDBErrorDomain";
 }
 
 @end
+
+
+
+#pragma mark - WriteBatch
+
+@implementation APLevelDBWriteBatch
+
+- (void)setData:(NSData *)data forKey:(NSString *)key
+{
+	leveldb::Slice keySlice = SliceFromString(key);
+	leveldb::Slice valueSlice = leveldb::Slice((const char *)[data bytes], (size_t)[data length]);
+	_batch.Put(keySlice, valueSlice);
+}
+- (void)setString:(NSString *)str forKey:(NSString *)key
+{
+	leveldb::Slice keySlice = SliceFromString(key);
+	leveldb::Slice valueSlice = SliceFromString(str);
+	_batch.Put(keySlice, valueSlice);
+}
+
+- (void)removeKey:(NSString *)key
+{
+	leveldb::Slice keySlice = SliceFromString(key);
+	_batch.Delete(keySlice);
+}
+
+- (void)clear
+{
+	_batch.Clear();
+}
+
+@end
+

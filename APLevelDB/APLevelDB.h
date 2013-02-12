@@ -27,7 +27,7 @@
 extern NSString * const APLevelDBErrorDomain;
 
 @class APLevelDBIterator;
-
+@protocol APLevelDBWriteBatch;
 
 @interface APLevelDB : NSObject
 
@@ -59,6 +59,11 @@ extern NSString * const APLevelDBErrorDomain;
 - (id)objectForKeyedSubscript:(id)key;
 - (void)setObject:(id)object forKeyedSubscript:(id<NSCopying>)key;
 
+// Batch update support:
+// Caller should invoke the writeBlock() parameter to its own block in order to finally apply the update.
+// writeBlock does not need to be invoked before returning from the caller's block.
+- (void)updateAtomicallyUsingBlock:(void (^)(id<APLevelDBWriteBatch> batch, void (^writeBlock)()))block;
+
 @end
 
 
@@ -74,5 +79,18 @@ extern NSString * const APLevelDBErrorDomain;
 - (NSString *)key;
 - (NSString *)valueAsString;
 - (NSData *)valueAsData;
+
+@end
+
+
+@protocol APLevelDBWriteBatch <NSObject>
+
+- (void)setData:(NSData *)data forKey:(NSString *)key;
+- (void)setString:(NSString *)str forKey:(NSString *)key;
+
+- (void)removeKey:(NSString *)key;
+
+// Remove all of the buffered sets and removes:
+- (void)clear;
 
 @end

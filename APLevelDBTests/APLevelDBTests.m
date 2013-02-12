@@ -227,6 +227,106 @@
 	STAssertNil([iter valueAsString], @"Iterator should return nil at end of keys.");
 }
 
+#pragma mark - Atomic Updates
+
+- (void)testAtomicSimple
+{
+	[_db setString:@"3" forKey:@"c"];
+	[_db updateAtomicallyUsingBlock:^(id<APLevelDBWriteBatch> batch, void (^writeBlock)()) {
+		[batch setString:@"1" forKey:@"a"];
+		[batch setString:@"2" forKey:@"b"];
+		[batch removeKey:@"c"];
+		writeBlock();
+	}];
+	
+	STAssertEqualObjects(_db[@"a"], @"1", @"Batch write did not execute");
+	STAssertEqualObjects(_db[@"b"], @"2", @"Batch write did not execute");
+	STAssertNil(_db[@"c"], @"Batch write did not remove key");
+}
+
+- (void)testAtomicWithClear
+{
+	[_db setString:@"3" forKey:@"c"];
+	[_db updateAtomicallyUsingBlock:^(id<APLevelDBWriteBatch> batch, void (^writeBlock)()) {
+		[batch setString:@"1" forKey:@"a"];
+		[batch setString:@"2" forKey:@"b"];
+		[batch removeKey:@"c"];
+		[batch clear];
+		writeBlock();
+	}];
+	
+	STAssertNil(_db[@"a"], @"Batch write did not clear buffered write");
+	STAssertNil(_db[@"b"], @"Batch write did not clear buffered write");
+	STAssertEqualObjects(_db[@"c"], @"3", @"Batch clear buffered remove");
+}
+
+- (void)testAtomicWithClearThenMutate
+{
+	[_db setString:@"3" forKey:@"c"];
+	[_db updateAtomicallyUsingBlock:^(id<APLevelDBWriteBatch> batch, void (^writeBlock)()) {
+		[batch setString:@"1" forKey:@"a"];
+		[batch clear];
+		[batch setString:@"2" forKey:@"b"];
+		[batch removeKey:@"c"];
+		writeBlock();
+	}];
+	
+	STAssertNil(_db[@"a"], @"Batch write did not clear buffered write");
+	STAssertEqualObjects(_db[@"b"], @"2", @"Batch write did not execute after clear");
+	STAssertNil(_db[@"c"], @"Batch write did not remove key after clear");
+}
+
+- (void)testAtomicAsync
+{
+	// Create a background queue on which we will perform the write.
+	// Start it suspended so it doesn't run until we've checked the
+	// conditions prior to the writes.
+	dispatch_queue_t queue = dispatch_queue_create(__PRETTY_FUNCTION__, DISPATCH_QUEUE_SERIAL);
+	dispatch_suspend(queue);
+	
+	// The semaphore will tell us when the write block has been called.
+	dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+	
+	[_db setString:@"3" forKey:@"c"];
+	[_db updateAtomicallyUsingBlock:^(id<APLevelDBWriteBatch> batch, void (^writeBlock)()) {
+		// Batch a few writes immediately:
+		[batch setString:@"1" forKey:@"a"];
+		[batch setString:@"2" forKey:@"b"];
+		
+		// Then do one more on another queue, after updateAtomicallyUsingBlock: has returned.
+		// Call the writeBlock from that queue.
+		dispatch_async(queue, ^{
+			// According to the leveldb docs, the leveldb object does necessary synchronization for
+			// writes from multiple threads, so it's okay to call writeBlock() from a thread/queue
+			// other than the one the database was created on.
+			// In this case, due to the suspend and semaphore usage, it isn't being written concurrently
+			// with any other activity anyway.
+			[batch removeKey:@"c"];
+			
+			// Execute the batched writes:
+			writeBlock();
+			
+			// Tell the main thread that we're done and it can check our work.
+			dispatch_semaphore_signal(sem);
+		});
+	}];
+	
+	STAssertNil(_db[@"a"], @"Batch write did not clear buffered write");
+	STAssertNil(_db[@"b"], @"Batch write did not clear buffered write");
+	STAssertEqualObjects(_db[@"c"], @"3", @"Batch clear buffered remove");
+
+	// We have checked the preconditions; now we can allow the background thread to run.
+	dispatch_resume(queue);
+	
+	// Wait until the writeBlock has been called before checking.
+	dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
+	
+	STAssertEqualObjects(_db[@"a"], @"1", @"Batch write did not execute");
+	STAssertEqualObjects(_db[@"b"], @"2", @"Batch write did not execute");
+	STAssertNil(_db[@"c"], @"Batch write did not remove key");
+}
+
+
 #pragma mark - Helpers
 
 - (NSData *)largeData
